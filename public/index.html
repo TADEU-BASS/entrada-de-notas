@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Fotos</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family: Arial, sans-serif;
+}
+
+body{
+    background:#f2f2f2;
+}
+
+.container{
+    max-width:700px;
+    margin:auto;
+    padding:15px;
+}
+
+.card{
+    background:white;
+    border-radius:14px;
+    padding:18px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.1);
+}
+
+h2{
+    text-align:center;
+    margin-bottom:10px;
+}
+
+.infoData{
+    text-align:center;
+    font-size:14px;
+    margin-bottom:15px;
+    color:#666;
+}
+
+label{
+    font-weight:bold;
+}
+
+input{
+    width:100%;
+    padding:14px;
+    border-radius:10px;
+    border:1px solid #ccc;
+    font-size:16px;
+    margin-top:5px;
+    margin-bottom:10px;
+}
+
+.btn{
+    width:100%;
+    padding:16px;
+    border:none;
+    border-radius:10px;
+    font-size:17px;
+    font-weight:bold;
+    margin-top:10px;
+    cursor:pointer;
+}
+
+.btnCamera{ background:#007bff; color:white; }
+.btnCapturar{ background:#ff9800; color:white; }
+.btnEnviar{ background:#2196f3; color:white; }
+.btnNova{ background:#28a745; color:white; display:none; }
+
+video{
+    width:100%;
+    border-radius:12px;
+    margin-top:12px;
+    display:none;
+}
+
+.preview{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px,1fr));
+    gap:10px;
+    margin-top:15px;
+}
+
+.previewItem{
+    position:relative;
+}
+
+.previewItem img{
+    width:100%;
+    height:110px;
+    object-fit:cover;
+    border-radius:10px;
+}
+
+.btnExcluir{
+    position:absolute;
+    top:-8px;
+    right:-8px;
+    width:26px;
+    height:26px;
+    border:none;
+    border-radius:50%;
+    background:red;
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+@media(max-width:480px){
+    .btn{
+        padding:18px;
+        font-size:18px;
+    }
+
+    input{
+        font-size:18px;
+        padding:16px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<div class="card">
+
+<h2>Registro de Fotos</h2>
+
+<div class="infoData" id="dataHora"></div>
+
+<form id="formulario">
+
+<label>Número da Nota</label>
+<input type="text" id="nota" required>
+
+<button type="button" class="btn btnCamera" onclick="abrirCamera()">📷 Abrir Câmera</button>
+
+<video id="video" autoplay playsinline></video>
+
+<button type="button" class="btn btnCapturar" onclick="capturarFoto()">Capturar Foto</button>
+
+<div class="preview" id="preview"></div>
+
+<button type="submit" class="btn btnEnviar">Enviar Fotos</button>
+
+<button type="button" id="btnNovaNota" class="btn btnNova" onclick="novaNota()">Nova Nota</button>
+
+</form>
+
+</div>
+</div>
+
+<script>
+
+let stream;
+let fotos = [];
+
+/* DATA E HORA */
+function atualizarDataHora(){
+    document.getElementById("dataHora").innerText =
+        new Date().toLocaleString("pt-BR");
+}
+setInterval(atualizarDataHora,1000);
+atualizarDataHora();
+
+/* ABRIR CAMERA */
+async function abrirCamera(){
+
+    const video = document.getElementById("video");
+
+    try{
+
+        stream = await navigator.mediaDevices.getUserMedia({
+            video:{ facingMode:{ ideal:"environment" } },
+            audio:false
+        });
+
+    }catch{
+
+        try{
+            stream = await navigator.mediaDevices.getUserMedia({
+                video:true,
+                audio:false
+            });
+        }catch{
+            alert("Não foi possível acessar a câmera.\nVerifique permissões.");
+            return;
+        }
+    }
+
+    video.srcObject = stream;
+    video.style.display = "block";
+}
+
+/* CAPTURAR FOTO */
+function capturarFoto(){
+
+    const video = document.getElementById("video");
+
+    if(!stream){
+        alert("Abra a câmera primeiro");
+        return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video,0,0);
+
+    canvas.toBlob(blob => {
+
+        fotos.push(blob);
+
+        criarPreview(blob);
+
+    },"image/jpeg");
+}
+
+/* PREVIEW */
+function criarPreview(blob){
+
+    const preview = document.getElementById("preview");
+
+    const div = document.createElement("div");
+    div.className = "previewItem";
+
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(blob);
+
+    const btnExcluir = document.createElement("button");
+    btnExcluir.innerText = "X";
+    btnExcluir.className = "btnExcluir";
+
+    btnExcluir.onclick = () => {
+        const index = fotos.indexOf(blob);
+        if(index > -1) fotos.splice(index,1);
+        div.remove();
+    };
+
+    div.appendChild(img);
+    div.appendChild(btnExcluir);
+    preview.appendChild(div);
+}
+
+/* ENVIAR */
+document.getElementById("formulario").addEventListener("submit", async e => {
+
+    e.preventDefault();
+
+    const nota = document.getElementById("nota").value.trim();
+
+    if(!nota) return alert("Digite a nota");
+    if(fotos.length === 0) return alert("Capture pelo menos uma foto");
+
+    const formData = new FormData();
+    formData.append("nota", nota);
+
+    fotos.forEach((foto,i)=>{
+        formData.append("fotos", foto, `foto_${i}.jpg`);
+    });
+
+    try{
+
+        const resp = await fetch("/upload",{
+            method:"POST",
+            body:formData
+        });
+
+        if(!resp.ok) throw new Error(await resp.text());
+
+        alert("Upload realizado!");
+
+        document.getElementById("btnNovaNota").style.display = "block";
+
+    }catch(err){
+        alert(err.message);
+    }
+
+});
+
+/* NOVA NOTA */
+function novaNota(){
+
+    fotos = [];
+    document.getElementById("preview").innerHTML = "";
+    document.getElementById("nota").value = "";
+    document.getElementById("btnNovaNota").style.display = "none";
+}
+
+</script>
+
+</body>
+</html>
